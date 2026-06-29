@@ -1,0 +1,15 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+*.egg-info/
+
+# Virtual environment
+.venv/
+venv/
+
+# Generated / collected market data (regenerable via quant_system/collect*.py, universe.py)
+data/
+
+# OS / editor
+.DS_Store
