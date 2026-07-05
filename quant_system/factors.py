@@ -53,6 +53,11 @@ def compute_factors(panel: pd.DataFrame) -> dict[str, pd.DataFrame]:
     lowvol   : -std_{LOWVOL_WINDOW} of log returns. Long low realized vol.
     range    : MA_{RANGE_WINDOW} of (high-low)/close. Persistent intraday range LEVEL.
     reversal : -sum_{REVERSAL_WINDOW} of log returns. Long recent losers.
+    semivar_imbalance : normalized signed realized semivariance over SEMIVAR_WINDOW,
+               (RS- - RS+)/(RS- + RS+ + eps) with RS-=Sum r^2*1{r<0}, RS+=Sum r^2*1{r>0}.
+               >0 => downside semivariance dominates. The normalization keeps it from
+               collapsing into a vol-LEVEL factor; the long/short sign is UNVERIFIED and
+               left for the train-only IC gate to confirm (see the wiki factor page).
 
     NaN where the trailing lookback is insufficient (min_periods = full window).
     """
@@ -79,11 +84,19 @@ def compute_factors(panel: pd.DataFrame) -> dict[str, pd.DataFrame]:
         config.REVERSAL_WINDOW, min_periods=config.REVERSAL_WINDOW
     ).sum()
 
+    # signed realized semivariance imbalance (normalized so it is not a vol-level proxy)
+    w = config.SEMIVAR_WINDOW
+    eps = 1e-12
+    rs_minus = (r.clip(upper=0.0) ** 2).rolling(w, min_periods=w).sum()  # Sum r^2*1{r<0}
+    rs_plus = (r.clip(lower=0.0) ** 2).rolling(w, min_periods=w).sum()   # Sum r^2*1{r>0}
+    semivar_imbalance = (rs_minus - rs_plus) / (rs_minus + rs_plus + eps)
+
     return {
         "momentum": momentum,
         "lowvol": lowvol,
         "range": range_,
         "reversal": reversal,
+        "semivar_imbalance": semivar_imbalance,
     }
 
 
@@ -132,11 +145,11 @@ def _zscore_rows(df: pd.DataFrame) -> pd.DataFrame:
 def composite_score(
     factors: dict[str, pd.DataFrame], universe: pd.DataFrame
 ) -> pd.DataFrame:
-    """Equal-weight composite of the 4 z-scored factors, per-timestamp z-scored
+    """Equal-weight composite of the z-scored factors, per-timestamp z-scored
     within that timestamp's PIT universe. Index=open_time, columns=symbol.
     NaN outside the PIT universe.
     """
-    keys = ["momentum", "lowvol", "range", "reversal"]
+    keys = list(factors)
     index = factors["momentum"].index
     symbols = factors["momentum"].columns
 
@@ -187,12 +200,13 @@ def _selftest() -> None:
 
     # --- shape + warmup-only-NaN ---
     factors = compute_factors(panel)
-    assert set(factors) == {"momentum", "lowvol", "range", "reversal"}
+    assert set(factors) == {"momentum", "lowvol", "range", "reversal", "semivar_imbalance"}
     warmup = {
         "momentum": config.MOMENTUM_WINDOW + config.REVERSAL_WINDOW,
         "lowvol": config.LOWVOL_WINDOW,
         "range": config.RANGE_WINDOW,
         "reversal": config.REVERSAL_WINDOW,
+        "semivar_imbalance": config.SEMIVAR_WINDOW,
     }
     for k, df in factors.items():
         assert list(df.columns) == symbols, k
@@ -254,6 +268,28 @@ def _selftest() -> None:
         assert np.allclose(row_means.values, 0.0, atol=1e-9), "composite row mean != 0"
     print(f"composite test PASS: PIT-masked (CCC NaN on day 0), rows z-centered "
           f"({len(nz)} fully-populated rows)")
+
+    # --- semivar_imbalance SIGN semantics: downside-dominated -> +, upside -> - ---
+    w = config.SEMIVAR_WINDOW
+    idx2 = pd.date_range("2025-01-01", periods=w + 2, freq="1min", tz="UTC", name="open_time")
+    flat = np.full(len(idx2), 100.0)
+    down = flat.copy(); down[-1] = 100.0 * np.exp(-0.05)   # one large negative return
+    up = flat.copy(); up[-1] = 100.0 * np.exp(+0.05)       # one large positive return
+    frames = {}
+    for name, cl in (("DNUSDT", down), ("UPUSDT", up)):
+        s = pd.Series(cl, index=idx2)
+        frames[("close", name)] = s
+        frames[("high", name)] = s
+        frames[("low", name)] = s
+        frames[("volume", name)] = pd.Series(1.0, index=idx2)
+    p2 = pd.DataFrame(frames)
+    p2.columns = pd.MultiIndex.from_tuples(p2.columns, names=["field", "symbol"])
+    si = compute_factors(p2)["semivar_imbalance"]
+    assert -1.0 - 1e-9 <= si.iloc[-1].min() and si.iloc[-1].max() <= 1.0 + 1e-9, "imbalance out of [-1,1]"
+    assert si["DNUSDT"].iloc[-1] > 0, "downside-dominated must give positive imbalance"
+    assert si["UPUSDT"].iloc[-1] < 0, "upside-dominated must give negative imbalance"
+    print(f"semivar_imbalance sign PASS: DN={si['DNUSDT'].iloc[-1]:+.3f} (>0), "
+          f"UP={si['UPUSDT'].iloc[-1]:+.3f} (<0), bounded in [-1,1]")
 
     print("\nALL SELF-TESTS PASSED")
 

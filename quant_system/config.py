@@ -33,6 +33,7 @@ MOMENTUM_WINDOW = 240                     # 4h trend, positive tilt
 LOWVOL_WINDOW = 120                       # 2h realized-vol (negated -> long low-vol)
 RANGE_WINDOW = 60                         # 1h persistent (high-low)/close level
 REVERSAL_WINDOW = 5                       # 5m short-term reversal (negated)
+SEMIVAR_WINDOW = 120                      # 2h realized-semivariance imbalance lookback (signed)
 # rebalance every N bars; signals are native 1m but turnover is capped here (honest cost knob)
 REBALANCE_EVERY = 5
 

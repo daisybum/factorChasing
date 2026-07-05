@@ -17,7 +17,9 @@ paper protocol. It is an implementation audit page, not a performance claim.
   Binance contract dates plus CoinGecko market-cap history; delisted names are retained
   before their stop date.
 - **Causal factor path:** `quant_system/factors.py` computes backward-only momentum,
-  low-vol, range, and reversal signals, then masks scores to the PIT universe.
+  low-vol, range, reversal, and a normalized signed realized-semivariance imbalance
+  ([[signed-semivariance-imbalance]], a repo-original candidate, `unverified`), then masks
+  scores to the PIT universe.
 - **Deterministic protocol layer:** `quant_system/protocol.py` computes forward targets,
   train-only IC diagnostics, explicit IC/t-stat gates, and a train-only ridge combiner.
 - **Evaluation path:** `quant_system/backtest.py` applies a 1-bar execution lag, transaction

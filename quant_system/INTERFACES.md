@@ -49,11 +49,14 @@ def build_panel(symbols: list[str]) -> pandas.DataFrame: ...
     # wide close/high/low/volume panel: index=open_time (1m), columns=MultiIndex
     # (field, symbol). Built from collect.load_klines. Backward-only.
 def compute_factors(panel: pandas.DataFrame) -> dict[str, pandas.DataFrame]: ...
-    # returns {"momentum":df, "lowvol":df, "range":df, "reversal":df}
+    # returns {"momentum":df, "lowvol":df, "range":df, "reversal":df, "semivar_imbalance":df}
     # each df: index=open_time, columns=symbol, values=raw factor (causal, NaN if short).
+    # semivar_imbalance = (RS- - RS+)/(RS- + RS+ + eps) over SEMIVAR_WINDOW (normalized,
+    # bounded [-1,1]); long/short sign is UNVERIFIED, left to the train-only IC gate.
 def composite_score(factors: dict, universe: pandas.DataFrame) -> pandas.DataFrame: ...
     # cross-sectional z-score per timestamp within that ts's PIT universe, equal-weight
-    # combine -> one score df (index=open_time, columns=symbol). NaN outside PIT universe.
+    # combine of ALL factors in the dict -> one score df (index=open_time, columns=symbol).
+    # NaN outside PIT universe.
 def pit_membership(universe: pandas.DataFrame, index: pandas.DatetimeIndex) -> pandas.DataFrame: ...
     # boolean PIT universe mask (index=open_time, columns=symbol).
 ```

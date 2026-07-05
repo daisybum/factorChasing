@@ -82,3 +82,26 @@ from the paper claims.
   reproduction, placeholder IC/ridge settings, and different venue/frequency.
 - **Index wiring:** added the page under Concepts and the Status board. No performance
   metric was added or upgraded.
+
+## 2026-06-30 — Add repo-original factor: signed semivariance imbalance
+Added a 5th, repo-original candidate to the Binance perp seed (NOT a paper factor).
+- **Code:** `quant_system/factors.py` `compute_factors` now returns `semivar_imbalance` =
+  `(RS⁻ − RS⁺)/(RS⁻ + RS⁺ + eps)` over `config.SEMIVAR_WINDOW=120` (2h), normalized to
+  [-1,1] so it cannot collapse into a vol-level proxy. `composite_score` generalized to
+  `keys = list(factors)`. No `run.py` change (the discovery dict is iterated generically).
+- **Sign is UNVERIFIED** (pre-registered "long downside-dominated", left to the train-only IC
+  gate; not flipped post-hoc). Do NOT call it a "jump" factor without an explicit jump estimator.
+- **Tests:** `quant_system/factors.py` self-test + `tests/test_bias_controls.py` cover sign
+  semantics, [-1,1] bounds, finiteness, and causality-under-truncation. Full pytest green.
+- **Page:** [[signed-semivariance-imbalance]]; indexed under "Repo-original factors" in
+  [[factors-index]]; implementation audit updated in [[binance-port-protocol]].
+- **Read-only smoke (recent 11-day in-universe slice, NOT a real OOS run):** factor flows through
+  the discovery path; train-only gate **passed** with `mean_IC=+0.0053, t_IC=+2.27` (split: train
+  recent-slice, cost: n/a — DIAGNOSTIC ONLY, not promoted to the page). Spearman rank-corr vs
+  reversal/lowvol/range = **+0.10 / −0.03 / +0.02** → orthogonal as designed. Composite cost sweep
+  is the usual 1m cost-dominated negative (turnover ~1.1e5/yr), Sharpe monotone-decreasing in bp.
+- **Blocker for a real eval:** klines are backfilled 2020→2026 (~3.4M bars) but `data/universe.parquet`
+  only covers the recent **30 days** (2026-05-27..06-25), so a proper train/valid/OOS gate lands in
+  an empty universe. A real evaluation needs the PIT universe rebuilt across the full panel span.
+- **Open:** orthogonality out-of-slice, 1m vs 5m microstructure-noise robustness, and the 5/10/20 bp
+  cost sweep on an isolated (lower-turnover) build — all pending the universe rebuild.

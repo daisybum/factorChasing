@@ -40,4 +40,12 @@ Final combined book: [[aggregated-portfolio]] (ridge of survivors → equal-weig
 Failed/noisy per paper: **range *changes*** and **volume *recoveries***. Stable:
 **level scarcity** and **attention**.
 
+## Repo-original factors (NOT from the paper)
+Candidates added to the Binance USDⓈ-M perp seed, kept separate from the paper's Table 1 so
+provenance is not confused. All `unverified` until the train-only gate + cost sweep run.
+
+| Factor (page) | Source | Idea | Status |
+|---|---|---|---|
+| [[signed-semivariance-imbalance]] | repo-original | normalized signed realized-semivariance `(RS⁻−RS⁺)/(RS⁻+RS⁺)` | unverified |
+
 Related: [[constrained-factor-dsl]] · [[ic-gating]] · [[capacity-constraint]]
